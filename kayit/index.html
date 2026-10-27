@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>İlim’le · Recorder</title>
+<style>
+/* İlim’le ses kayıt sayfası: öğrenci uygulamaları Google Apps Script içinde mikrofona erişemediği için kayıt burada yapılır
+   ve öğretmenin paneline gönderilir. Bilinçli olarak tek, koyu bir görünüm. */
+:root{color-scheme:dark;--bg:#0B1430;--kart:#15214A;--kart2:#1C2B5E;--cizgi:rgba(255,255,255,.14);--ink:#F2F5FF;--ink2:#C3CCEB;--muted:#8E9AC4;--vurgu:#B36BFF;--ok:#3EE08F;--no:#FF7A6B;--altin:#FFC83D;--f:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:radial-gradient(ellipse at 50% -10%,#2A3F86,transparent 60%),var(--bg);background-attachment:fixed;color:var(--ink);font-family:var(--f);font-size:17px;line-height:1.5;min-height:100vh;-webkit-font-smoothing:antialiased}
+button,a.btn{font:inherit;cursor:pointer}
+.wrap{max-width:620px;margin:0 auto;padding:18px 16px 60px}
+.ust{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.ust .logo{font-weight:900;font-size:20px;letter-spacing:.02em}
+.ust .logo span{color:var(--altin)}
+.ust small{margin-left:auto;color:var(--muted);font-weight:700}
+.kart{background:var(--kart);border:1px solid var(--cizgi);border-radius:20px;padding:16px;margin-top:12px}
+h1{font-size:22px;margin:0 0 4px;line-height:1.25}
+.muted{color:var(--muted)}
+.onz{background:rgba(255,200,61,.14);border:1px dashed var(--altin);border-radius:12px;padding:8px 12px;font-weight:800;font-size:14.5px;margin-top:10px}
+.oge{display:flex;align-items:center;gap:10px;border:1px solid var(--cizgi);border-radius:14px;padding:10px 12px;margin-top:8px;background:rgba(0,0,0,.15)}
+.oge p{margin:0;flex:1;font-weight:700}
+.kbtn{border:1px solid var(--cizgi);background:rgba(255,255,255,.08);color:var(--ink);border-radius:12px;padding:6px 10px;font-weight:800}
+.soru{font-size:21px;font-weight:900;margin:8px 0;min-height:54px}
+.ipucu{display:flex;flex-wrap:wrap;gap:6px}
+.ipucu span{background:rgba(179,107,255,.2);border:1px solid rgba(179,107,255,.6);border-radius:10px;padding:3px 10px;font-weight:700;font-size:14.5px}
+.kartb{background:#FBF0D3;color:#22180A;border-radius:16px;padding:14px}
+.kartb h2{font-size:19px;margin:0 0 6px;color:#7A3E00}
+.kartb ul{margin:6px 0;padding-left:20px;font-weight:700}
+textarea{width:100%;min-height:90px;border-radius:12px;border:1px solid var(--cizgi);background:rgba(0,0,0,.25);color:var(--ink);padding:10px;font:inherit;margin-top:8px}
+.mic-alan{text-align:center;padding:18px 10px}
+.sayac{font-size:40px;font-weight:900;letter-spacing:.04em;font-variant-numeric:tabular-nums}
+.bar{height:8px;border-radius:9px;background:rgba(255,255,255,.12);overflow:hidden;max-width:320px;margin:6px auto}
+.bar i{display:block;height:100%;width:0;background:var(--vurgu);transition:width .25s}
+.mic{width:110px;height:110px;border-radius:50%;border:0;background:linear-gradient(180deg,#D29BFF,#8A3CF0);color:#fff;font-size:46px;box-shadow:0 6px 0 #4E1A96;margin:10px auto;display:grid;place-items:center}
+.mic.kayit{background:linear-gradient(180deg,#FF8A7A,#E5372A);box-shadow:0 6px 0 #8E1A10;animation:nabiz 1.2s infinite}
+@keyframes nabiz{50%{box-shadow:0 6px 0 #8E1A10,0 0 0 16px rgba(255,90,70,.25)}}
+.durum{font-weight:800;color:var(--ink2)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:14px;padding:12px 20px;font-weight:900;font-size:16.5px;background:linear-gradient(180deg,#FFD866,#FFB21E);color:#3A2400;box-shadow:0 4px 0 #A86A00;text-decoration:none;min-height:48px}
+.btn.gh{background:rgba(255,255,255,.08);color:var(--ink);box-shadow:none;border:1px solid var(--cizgi)}
+.btn:disabled{opacity:.45;box-shadow:none}
+.satir{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:12px}
+.hata{color:var(--no);font-weight:800}
+.tamam{text-align:center}
+.tamam .e{font-size:64px}
+audio{width:100%;max-width:380px;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script>
+(function () {
+'use strict';
+var $ = function (s, r) { return (r || document).querySelector(s); };
+var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+var D = null;
+try { var h = (location.hash.match(/d=([^&]+)/) || [])[1]; if (h) D = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(h))))); } catch (e) { D = null; }
+var app = $('#app');
+var EN = !D || D.dil === 'en';
+var T = EN ? {
+  baslik: 'Recorder', yok: 'This link is not complete. Open it again from your app.', onz: '👁 Teacher preview: this recording will NOT be saved.',
+  dinle: '🔊', basla: 'Tap the microphone to start', kayitta: 'Recording… tap to stop', enAz: 'Speak for at least', dinleKendin: 'Listen to yourself 👂',
+  tekrar: '↻ Record again', gonder: '📨 Send to İlim Hoca', gonderiliyor: 'Sending…', kisa: 'Too short! Please speak a little longer.',
+  gitti: 'Sent! 🎉', gittiAlt: 'İlim Hoca will listen to it. You can close this page and go back to your app.', kapat: '↩ Back to my app',
+  mikHata: 'The microphone did not start. Allow the microphone for this page (tap the 🔒 icon next to the address) and try again.',
+  gonderHata: 'Could not send. Check the internet and try again.', baslaMulakat: '▶ Start', sonraki: 'Next question ▶', bitir: '⏹ Finish', soruTekrar: '🔁 Repeat',
+  hazirlik: 'Planning time', hazirim: 'I’m ready ⚡', konus: 'Now talk!', notlar: 'Your notes…', okuHepsi: 'Listen to each sentence, then record yourself reading ALL of them.',
+  soruNo: 'QUESTION', kontrol: 'Self-check before you send:'
+} : {
+  baslik: 'Ses kaydı', yok: 'Bu bağlantı eksik. Uygulamandan yeniden aç.', onz: '👁 Öğretmen önizlemesi: bu kayıt kaydedilmeyecek.',
+  dinle: '🔊', basla: 'Başlamak için mikrofona dokun', kayitta: 'Kaydediliyor… durdurmak için dokun', enAz: 'En az', dinleKendin: 'Kendini dinle 👂',
+  tekrar: '↻ Yeniden kaydet', gonder: '📨 İlim Hoca’ya gönder', gonderiliyor: 'Gönderiliyor…', kisa: 'Çok kısa! Biraz daha uzun konuş.',
+  gitti: 'Gönderildi! 🎉', gittiAlt: 'İlim Hoca dinleyecek. Bu sayfayı kapatıp uygulamana dönebilirsin.', kapat: '↩ Uygulamama dön',
+  mikHata: 'Mikrofon açılmadı. Bu sayfa için mikrofona izin ver (adres çubuğundaki 🔒 simgesi) ve tekrar dene.',
+  gonderHata: 'Gönderilemedi. İnternetini kontrol edip tekrar dene.', baslaMulakat: '▶ Başla', sonraki: 'Sonraki soru ▶', bitir: '⏹ Bitir', soruTekrar: '🔁 Tekrar',
+  hazirlik: 'Hazırlık süresi', hazirim: 'Hazırım ⚡', konus: 'Şimdi konuş!', notlar: 'Notların…', okuHepsi: 'Her cümleyi dinle, sonra hepsini sesli okuyarak kaydet.',
+  soruNo: 'SORU', kontrol: 'Göndermeden önce kontrol et:'
+};
+document.documentElement.lang = EN ? 'en' : 'tr';
+var ust = '<div class="ust"><div class="logo">İlim’<span>le</span> · ' + T.baslik + '</div>' + (D && D.ad ? '<small>' + esc(D.ad) + '</small>' : '') + '</div>';
+if (!D || !D.u || !D.s) { app.innerHTML = ust + '<div class="kart"><p class="hata">' + T.yok + '</p></div>'; return; }
+
+var min = Math.max(1, Number(D.min) || 5), max = Math.max(min + 5, Number(D.max) || 180);
+var sureYaz = function (s) { return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2); };
+
+/* ---------- konuşma sentezi ---------- */
+var sesler = [];
+function sesAl() { try { sesler = speechSynthesis.getVoices().filter(function (v) { return /^en/i.test(v.lang); }); } catch (e) {} }
+if (window.speechSynthesis) { sesAl(); speechSynthesis.onvoiceschanged = sesAl; }
+function soyle(metin, hiz, cb) {
+  if (!window.speechSynthesis) { if (cb) cb(); return; }
+  try { speechSynthesis.cancel(); } catch (e) {}
+  var u = new SpeechSynthesisUtterance(metin), v = sesler[0];
+  if (v) { u.voice = v; u.lang = v.lang; } else u.lang = EN ? 'en-GB' : 'tr-TR';
+  u.rate = hiz || 0.9; var bitti = false; var son = function () { if (!bitti) { bitti = true; if (cb) cb(); } };
+  u.onend = son; u.onerror = son; setTimeout(son, Math.max(4000, metin.length * 120));
+  speechSynthesis.speak(u);
+}
+
+/* ---------- kayıt ---------- */
+var rec = null, akis = null, parca = [], basla = 0, saya = null, blob = null, sn = 0;
+function kayitBaslat() {
+  return navigator.mediaDevices.getUserMedia({ audio: true }).then(function (st) {
+    akis = st; parca = []; blob = null;
+    var tip = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'].filter(function (t) { return window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t); })[0];
+    rec = tip ? new MediaRecorder(st, { mimeType: tip }) : new MediaRecorder(st);
+    rec.ondataavailable = function (e) { if (e.data && e.data.size) parca.push(e.data); };
+    rec.onstop = function () { clearInterval(saya); akis.getTracks().forEach(function (t) { t.stop(); }); sn = Math.round((Date.now() - basla) / 1000); blob = new Blob(parca, { type: rec.mimeType || 'audio/webm' }); kayitBitti(); };
+    rec.start(1000); basla = Date.now();
+    var m = $('#mic'); if (m) { m.classList.add('kayit'); m.textContent = '⏹'; }
+    $('#durum').textContent = T.kayitta;
+    saya = setInterval(function () { var s = Math.round((Date.now() - basla) / 1000); $('#say').textContent = sureYaz(s); $('#bar').style.width = Math.min(100, 100 * s / min) + '%'; if (s >= max) kayitDur(); }, 250);
+    return true;
+  }).catch(function (e) {
+    $('#hata').innerHTML = '<p class="hata">' + T.mikHata + '</p><p class="muted" style="font-size:13px">' + esc((e && e.name ? e.name + ': ' : '') + (e && e.message || '')) + '</p>';
+    return false;
+  });
+}
+function kayitDur() { if (rec && rec.state !== 'inactive') rec.stop(); }
+function kayitta() { return !!(rec && rec.state === 'recording'); }
+function kayitBitti() {
+  var m = $('#mic'); if (m) { m.classList.remove('kayit'); m.textContent = '🎙️'; m.hidden = true; }
+  $('#durum').textContent = '';
+  var kisa = sn < min;
+  $('#din').innerHTML = '<p class="durum">' + T.dinleKendin + '</p><audio controls src="' + URL.createObjectURL(blob) + '"></audio>' + (kisa ? '<p class="hata">' + T.kisa + ' (' + T.enAz + ' ' + sureYaz(min) + ')</p>' : '');
+  $('#akt').hidden = false; $('#gon').disabled = kisa;
+  if (sonra) sonra();
+}
+var sonra = null;
+function micAlani(mikDugmesi) {
+  return '<div class="kart mic-alan"><div class="sayac" id="say">0:00</div><div class="bar"><i id="bar"></i></div><div class="muted" style="font-weight:800;font-size:14px">' + T.enAz + ' ' + sureYaz(min) + '</div>' +
+    (mikDugmesi ? '<button class="mic" id="mic" aria-label="Record">🎙️</button>' : '') + '<div class="durum" id="durum">' + (mikDugmesi ? T.basla : '') + '</div><div id="hata"></div><div id="din"></div>' +
+    '<div class="satir" id="akt" hidden><button class="btn gh" id="tek">' + T.tekrar + '</button><button class="btn" id="gon">' + T.gonder + '</button></div><div id="gfb"></div></div>';
+}
+function micBagla() {
+  var m = $('#mic'); if (m) m.onclick = function () { if (kayitta()) kayitDur(); else kayitBaslat(); };
+  $('#tek').onclick = function () { location.reload(); };
+  $('#gon').onclick = gonder;
+}
+function detayTopla() { var d = {}; if (D.mod === 'kart') { d.notlar = ($('#nt') || {}).value || ''; d.ozDegerlendirme = Array.prototype.map.call(document.querySelectorAll('[data-oz]'), function (x) { return x.checked ? 1 : 0; }); } if (D.mod === 'soru') d.sorular = (D.sorular || []).map(function (q) { return q.s; }); return d; }
+function gonder() {
+  if (!blob) return;
+  var b = $('#gon'); b.disabled = true; b.textContent = T.gonderiliyor; $('#gfb').innerHTML = '';
+  var r = new FileReader();
+  r.onload = function () {
+    var detay = detayTopla(); detay.kayitSure = sn; detay.kaynak = 'kayit-sayfasi';
+    var govde = { islem: 'disSes', s: D.s, o: D.o, ad: D.a || 'Ses kaydı', b64: String(r.result).split(',')[1], mime: blob.type || 'audio/webm', kayitSure: sn, sure: sn, detay: detay, onizleme: !!D.on, cihaz: D.c || '', cihazAd: (D.cn || '') + ' · kayıt sayfası' };
+    fetch(D.u, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(govde) })
+      .then(function (x) { return x.json(); })
+      .then(function (j) {
+        if (!j || !j.ok) throw new Error((j && j.hata) || 'hata');
+        try { sessionStorage.setItem('ilimle_kayit_' + D.o, '1'); } catch (e) {}
+        app.innerHTML = ust + '<div class="kart tamam"><div class="e">✅</div><h1>' + T.gitti + '</h1><p>' + T.gittiAlt + '</p>' + (j.onizleme ? '<p class="onz">' + T.onz + '</p>' : '') + '<div class="satir"><button class="btn" id="kap">' + T.kapat + '</button></div></div>';
+        $('#kap').onclick = function () { window.close(); setTimeout(function () { history.back(); }, 300); };
+      })
+      .catch(function (e) { $('#gfb').innerHTML = '<p class="hata">' + T.gonderHata + '</p><p class="muted" style="font-size:13px">' + esc(e.message) + '</p>'; b.disabled = false; b.textContent = T.gonder; });
+  };
+  r.readAsDataURL(blob);
+}
+
+/* ---------- modlar ---------- */
+var h = ust + '<div class="kart"><h1>' + esc(D.b || D.a || T.baslik) + '</h1>' + (D.on ? '<div class="onz">' + T.onz + '</div>' : '');
+if (D.mod === 'oku') {
+  h += '<p class="muted" style="margin:6px 0 0">' + T.okuHepsi + '</p>' + (D.m || []).map(function (c, k) { return '<div class="oge"><p>' + (k + 1) + '. ' + esc(c) + '</p><button class="kbtn" data-s="' + k + '">' + T.dinle + '</button></div>'; }).join('') + '</div>' + micAlani(true);
+  app.innerHTML = h; micBagla();
+  Array.prototype.forEach.call(document.querySelectorAll('[data-s]'), function (b) { b.onclick = function () { soyle(D.m[Number(b.dataset.s)], 0.8); }; });
+}
+else if (D.mod === 'soru') {
+  var Q = D.sorular || [], i = -1, bekle = null;
+  h += (D.aciklama ? '<p class="muted" style="margin:6px 0 0">' + esc(D.aciklama) + '</p>' : '') + '</div><div class="kart"><div class="muted" style="font-weight:900;letter-spacing:.08em">' + T.soruNo + ' <span id="no">–</span> / ' + Q.length + '</div><div class="soru" id="sq">…</div><div class="ipucu" id="ip"></div>' +
+    '<div class="satir"><button class="btn" id="bas">' + T.baslaMulakat + '</button><button class="btn" id="son" hidden>' + T.sonraki + '</button><button class="btn gh" id="tkr" hidden>' + T.soruTekrar + '</button></div></div>' + micAlani(false);
+  app.innerHTML = h; micBagla();
+  var sor = function () {
+    i++; var q = Q[i], last = i === Q.length - 1, nb = $('#son');
+    $('#no').textContent = i + 1; $('#sq').textContent = '🗣️ ' + q.s; $('#ip').innerHTML = (q.ip || []).map(function (x) { return '<span>' + esc(x) + '</span>'; }).join('');
+    nb.hidden = false; nb.disabled = true; nb.textContent = last ? T.bitir : T.sonraki; $('#tkr').hidden = false;
+    soyle(q.s, 0.9, function () {
+      var kalan = Number(D.cevapSn) || 8; clearInterval(bekle);
+      bekle = setInterval(function () { kalan--; nb.textContent = (last ? T.bitir : T.sonraki) + (kalan > 0 ? ' (' + kalan + ')' : ''); if (kalan <= 0) { clearInterval(bekle); nb.disabled = false; } }, 1000);
+    });
+  };
+  $('#bas').onclick = function () { var b = this; b.disabled = true; kayitBaslat().then(function (ok) { if (ok) { b.hidden = true; sor(); } else b.disabled = false; }); };
+  $('#son').onclick = function () { if (i >= Q.length - 1) { try { speechSynthesis.cancel(); } catch (e) {} this.hidden = true; $('#tkr').hidden = true; $('#sq').textContent = '✅'; $('#ip').innerHTML = ''; kayitDur(); } else sor(); };
+  $('#tkr').onclick = function () { soyle(Q[i].s, 0.85); };
+}
+else if (D.mod === 'kart') {
+  var K = D.kart || {}, hz = Number(D.hazirSn) || 60, hmin = Number(D.hazirMin) || 30;
+  h += '<div class="kartb" style="margin-top:8px"><h2>🃏 ' + esc(K.b) + '</h2>' + (K.m && K.m.length ? '<b>' + (EN ? 'You should say:' : 'Şunları anlat:') + '</b><ul>' + K.m.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : '') + (K.son ? '<b>' + esc(K.son) + '</b>' : '') + '</div></div>' +
+    '<div class="kart mic-alan" id="hzk"><div class="muted" style="font-weight:900">' + T.hazirlik + '</div><div class="sayac" id="hzs">' + sureYaz(hz) + '</div><textarea id="nt" placeholder="' + T.notlar + '"></textarea><div class="satir"><button class="btn" id="hzr" disabled>' + T.hazirim + '</button></div></div>' + micAlani(true) +
+    (D.kontrol && D.kontrol.length ? '<div class="kart"><b>' + T.kontrol + '</b>' + D.kontrol.map(function (x, k) { return '<label style="display:flex;gap:8px;align-items:center;font-weight:700;margin-top:6px"><input type="checkbox" data-oz="' + k + '" style="width:20px;height:20px"> ' + esc(x) + '</label>'; }).join('') + '</div>' : '');
+  app.innerHTML = h; micBagla();
+  var mic = $('#mic'); mic.disabled = true; $('#durum').textContent = '⏳';
+  var gecen = 0, t = setInterval(function () { gecen++; var k = Math.max(0, hz - gecen); $('#hzs').textContent = sureYaz(k); if (gecen >= hmin) $('#hzr').disabled = false; if (k <= 0) basladi(); }, 1000);
+  var b2 = false;
+  var basladi = function () { if (b2) return; b2 = true; clearInterval(t); $('#hzr').disabled = true; $('#hzr').textContent = T.konus; mic.disabled = false; $('#durum').textContent = T.basla; kayitBaslat(); };
+  $('#hzr').onclick = basladi;
+}
+else {
+  h += (D.soru ? '<p style="font-weight:800;font-size:19px;margin:8px 0 0">' + esc(D.soru) + '</p>' : '') + (D.metin ? '<div class="kartb" style="margin-top:10px;white-space:pre-wrap">' + esc(D.metin) + '</div>' : '') + '</div>' + micAlani(true);
+  app.innerHTML = h; micBagla();
+}
+})();
+</script>
+</body>
+</html>
